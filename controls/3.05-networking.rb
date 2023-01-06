@@ -21,7 +21,7 @@ control_id = '3.5'
 control_abbrev = 'networking'
 
 control "cis-gcp-#{control_id}-#{control_abbrev}" do
-  impact 'none'
+  impact 'medium'
 
   title "[#{control_abbrev.upcase}] Ensure that RSASHA1 is not used for zone-signing key in Cloud DNS DNSSEC"
 
@@ -35,7 +35,6 @@ The algorithm used for key signing should be recommended one and it should not b
   tag cis_gcp: control_id.to_s
   tag cis_version: cis_version.to_s
   tag project: gcp_project_id.to_s
-  tag nist: ['CM-6']
 
   ref 'CIS Benchmark', url: cis_url.to_s
   ref 'GCP Docs', url: 'https://cloud.google.com/dns/dnssec-advanced#advanced_signing_options'
@@ -43,6 +42,7 @@ The algorithm used for key signing should be recommended one and it should not b
   managed_zone_names = google_dns_managed_zones(project: gcp_project_id).zone_names
 
   if managed_zone_names.empty?
+    impact 'none'
     describe "[#{gcp_project_id}] does not have DNS Zones. This test is Not Applicable." do
       skip "[#{gcp_project_id}] does not have DNS Zones."
     end
@@ -50,12 +50,12 @@ The algorithm used for key signing should be recommended one and it should not b
     managed_zone_names.each do |dnszone|
       zone = google_dns_managed_zone(project: gcp_project_id, zone: dnszone)
       if zone.visibility == 'private'
+        impact 'none'
         describe "[#{gcp_project_id}] DNS zone #{dnszone} has private visibility. This test is not applicable for private zones." do
           skip "[#{gcp_project_id}] DNS zone #{dnszone} has private visibility."
         end
       elsif zone.dnssec_config.state == 'on'
         zone.dnssec_config.default_key_specs.select { |spec| spec.key_type == 'zoneSigning' }.each do |spec|
-          impact 'medium'
           describe "[#{gcp_project_id}] DNS Zone [#{dnszone}] with DNSSEC zone-signing" do
             subject { spec }
             its('algorithm') { should_not cmp 'RSASHA1' }
@@ -63,7 +63,6 @@ The algorithm used for key signing should be recommended one and it should not b
           end
         end
       else
-        impact 'medium'
         describe "[#{gcp_project_id}] DNS Zone [#{dnszone}] DNSSEC" do
           subject { 'off' }
           it { should cmp 'on' }
